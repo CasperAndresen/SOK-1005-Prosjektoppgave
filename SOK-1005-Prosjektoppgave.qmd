@@ -1,0 +1,264 @@
+---
+title: "Sok-1005 Prosjektoppgave"
+author: "20, 30, 44"
+format: html
+editor: visual
+---
+
+```{r, warning=FALSE, message=FALSE}
+rm(list=ls())
+library(tidyverse)
+library(haven)
+library(lubridate)
+library(leaflet)
+library(scales)
+library(httr)
+```
+
+```{r}
+
+#setwd("C:/Users/jonvm/Documents/Sok-1005 Prosjektoppgave filer")
+#getwd()
+#list.files()
+
+```
+
+Setting a working directory to be able to read our customer count file, demography and the files related to our category.
+
+```{r}
+#ccount <- read_dta('C:/Users/jonvm/Documents/Sok-1005 Prosjektoppgave filer/ccount.dta')
+
+#demo <- read_dta('C:/Users/jonvm/Documents/Sok-1005 Prosjektoppgave filer/demo.dta')
+
+#upcber  <- read_csv('C:/Users/jonvm/Documents/Sok-1005 Prosjektoppgave filer/upcber.csv')
+
+#wber  <- read_csv('C:/Users/jonvm/Documents/Sok-1005 Prosjektoppgave filer/wber.csv')
+```
+
+Downloading dta files and csv files and saving them as dataframes.
+
+```{r}
+
+#df_1 <- merge(ccount, demo)
+
+#df_2 <- merge(upcber, wber, by = 'UPC') 
+```
+
+Merging customer count and demography, and upcber and wber.
+
+```{r}
+
+#df_1 <- df_1 %>%
+ # mutate(date = ymd(date)) #correcting date format.
+
+#df_1 <- df_1 %>%
+#  filter(between(date, as.Date('1992-01-01'), as.Date('1992-12-31'))) %>% #filtering out data before and after 1992.
+#  filter(beer > 0) #removes all 0 values.
+
+#WEEK <- strftime(df_1$date, format = "%V")
+
+#df_1 <- select(df_1, c('store','date','beer', 'custcoun'))
+
+#df_1 <- df_1 %>%
+#  cbind(WEEK) #attaching week numbers to dataframe.
+
+#df_1 <- rename(df_1, STORE = store) #changing name of variable and making merge possible.
+
+#df_1 <- df_1 %>%
+# group_by(STORE, WEEK) %>%
+#  summarize_at(c("beer", "custcoun"), sum) %>%
+#  ungroup()
+
+#df_1$WEEK<-gsub("0","",as.numeric(df_1$WEEK)) #removing unwanted numbers from WEEK.
+
+```
+
+```{r}
+
+#df_2 <- select(df_2, c('UPC','COM_CODE','DESCRIP', 'SIZE', 'CASE', 'STORE', 'WEEK', 'MOVE', 'QTY', 'PRICE', 'PROFIT')) # selecting the colums we want.
+
+#df_2 <- df_2 %>%
+ # filter(MOVE > 0) %>%
+#  filter(between(WEEK,(121), (173))) # 121 being the first week of 1992, and 173 being the transitioning week between 1992 and 1993.
+
+#df_2['WEEK'] <- df_2['WEEK'] - 120 # correcting week numbers.
+
+```
+
+```{r}
+
+#year <- 1992
+#Month<-sample(1:12,387400,replace=TRUE)
+#DayOfMonth<-sample(1:30,387400,replace=TRUE)
+
+#df_2 <- df_2 %>% 
+ # mutate(df_2,Dates=paste(year,Month,DayOfMonth,sep="/")) #attaching dates to dataframe.
+
+#Oppgave_1 <- merge(df_2, df_1) %>%
+ # filter(PROFIT > 0) #filters out blank profit.
+```
+
+Cleaning up data as to make it easier to work with and removing unnecessary clutter.
+
+```{r}
+
+#Oppgave_1  <- read_csv('C:/Users/jonvm/Documents/Sok-1005 Prosjektoppgave filer/oppgave1.csv') #download alteratve from working directory.
+
+zip_url <- "https://github.com/CasperAndresen/SOK-1005-Prosjektoppgave/raw/main/oppgave1.zip"
+
+response <- GET(zip_url, write_disk("oppgave1.zip", overwrite = TRUE))
+Oppgave_1 <- read.csv(unz("oppgave1.zip", "oppgave1.csv")) #online download alternative.
+
+#Two different download alternatives, remove the # from the preferred alternative and add # to the one not being used.
+```
+
+Two different download alternatives, remove the \# from the preferred alternative and add \# to the one not being used.
+
+```{r}
+Oppgave_2 <- Oppgave_1 %>%
+   mutate(BRAND = str_extract(DESCRIP, 'MILLER|OLD STYLE|BUDWEISER|HAMMS|LEINENKUGEL')) %>% # selecting brands we want to move forward with.
+  group_by(STORE, WEEK, BRAND) %>%
+  summarize_at(c("MOVE", "PROFIT"), sum) %>%
+  ungroup() %>%
+  na.omit(Oppgave_2)
+```
+
+```{r}
+store12profit <- Oppgave_2 %>%
+  filter(STORE == 12)  #selects store 12.
+
+store12profit$BRAND <- reorder(store12profit$BRAND, store12profit$PROFIT)
+store12profit$BRAND <- factor(store12profit$BRAND, levels=rev(levels(store12profit$BRAND))) #sorting brand from lowest value to highest value.
+
+```
+
+```{r}
+store12profit %>%
+  ggplot(aes(x = WEEK, y = PROFIT, color = BRAND)) +
+  labs(title = "Store 12 profit", subtitle = "Selected beer brands. 1992") +
+     scale_x_continuous(breaks= pretty_breaks()) +
+  geom_line(linewidth=1)
+```
+
+I denne figuren har vi valgt ut butikk nummer 12 for å illustrere salget av et utvalg med ølmerker. Vi har valgt 5 ølmerker som selges mye i de fleste butikkene. Miller har en klar ledelse, men merkene Budwiser og Old style selges det også mye av.
+
+```{r}
+total_profit <- Oppgave_2 %>%
+  group_by(WEEK, BRAND) %>%
+  summarize_at(c("MOVE", "PROFIT"), sum) %>%
+  ungroup()
+
+total_profit$BRAND <- reorder(total_profit$BRAND, total_profit$PROFIT)
+total_profit$BRAND <- factor(total_profit$BRAND, levels=rev(levels(total_profit$BRAND)))
+```
+
+```{r, warning=FALSE}
+total_profit %>%
+  ggplot(aes(x = WEEK, y = PROFIT, color = BRAND)) +
+  labs(title = "Collective profit", subtitle = "Selected beer brands. 1992") +
+     scale_x_continuous(breaks= pretty_breaks()) +
+  geom_line(linewidth=1) +
+  stat_summary(fun.y = sum, na.rm = TRUE, color = 'black', geom ='line')
+```
+
+Her viser vi den sammensatte profitten av de utvalgte ølmerkene i alle butikkene i Chicago. Miller er fortsatt det mest solgte merket, mens Budwiser ser ut til å ha blitt tatt igjen av Old Style. Den sorte linjen representerer det totale salget av alle de 5 ølmerkene.
+
+```{r}
+
+Oppgave_3 <- Oppgave_1 %>%
+   mutate(Month = Dates, sep="/") #
+  
+Oppgave_3$Month  <- substr(Oppgave_3$Month, start = 6, stop = 7) #shortening the date leaving only the month number.
+
+Oppgave_3$Month <- gsub('/','',Oppgave_3$Month) #removing unwanted symbol from month number.
+
+
+Oppgave_3 <- Oppgave_3 %>%
+mutate(BRAND = str_extract(DESCRIP, 'MILLER|OLD STYLE|BUDWEISER|HAMMS|LEINENKUGEL'))
+
+monthlyprofit <- Oppgave_3 %>%
+   group_by(Month, BRAND) %>%
+  summarize_at(c("MOVE", "PROFIT"), sum) %>%
+  ungroup() %>%
+  na.omit(monthlyprofit)
+
+monthlyprofit$Month <- as.numeric(monthlyprofit$Month) #changing month number to correct type.
+
+monthlyprofit <- monthlyprofit %>%
+  arrange(Month) #sorting month number in the right order.
+
+monthlyprofit$BRAND <- reorder(monthlyprofit$BRAND, monthlyprofit$PROFIT)
+monthlyprofit$BRAND <- factor(monthlyprofit$BRAND, levels=rev(levels(monthlyprofit$BRAND)))
+```
+
+```{r}
+monthlyprofit %>%
+  ggplot(aes(x = Month, y = PROFIT, fill = BRAND)) +
+  labs(title = "Total monthly profit", subtitle = "Selected beer brands. 1992") +
+  scale_x_continuous(breaks= pretty_breaks()) +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  geom_bar(stat = 'identity', width = 0.75)
+```
+
+Her vises salg av de 5 ølmerkene på et månedlig basis, salgsdifferansen er stort sett lik som i den totale årlige analysen med Miller på topp og Old style og Budwiser som andre og tredje plass. Miller står for om lag 50% av det totale salget når man sammenlignet salget av disse 5 ølmerkene.
+
+```{r}
+#Oppgave 4.
+
+#Setting up the dataframe to be able plot to markers on the map in the leaflet package.
+
+#df_map <- demo[,c(1:6, 8),]
+
+#df_map <- df_map %>%
+ # na.omit(df_map)
+
+#wbermap <- wber %>%
+ # filter(MOVE >0) %>%
+  #filter(between(WEEK,(121), (173)))
+
+#names(df_map)[names(df_map) == "store"] <- "STORE"
+
+
+#wbermap <- wbermap[,c(1,8)] %>%
+ # group_by(STORE) %>%
+#  summarize_at(c('PROFIT'),sum)
+
+
+#map <- merge(df_map, wbermap, by = "STORE")
+
+#map <- map %>%
+ # rename(long = 6, lat = 7)
+
+#map <- map %>%
+ # mutate(lat = lat/-10000) %>%
+#  mutate(long = long/10000)
+```
+
+I oppgave 4 har vi satt opp ett datasett som inneholder koordinatene som viser lokasjonene til deres butikker og butikkene deres årlige profitt. Koden redegjør et datasett som skal brukes i å visuelt vise dere hvordan butikkene deres i Chicago-området gjør det med hjelp av leaflet pakken.
+
+```{r, message=FALSE}
+
+map <- read_csv("https://raw.githubusercontent.com/CasperAndresen/SOK-1005-Prosjektoppgave/main/mapdata.csv")
+
+#The code that plots the map markers that show us how profitable the stores around the chicago are are.
+
+radopa <- colorNumeric(c(palette = "red","green"), domain = map$PROFIT) #Creates a color palette that gives stores with more profit a greener radial, and stores with low profit a more red radial.
+
+m <- leaflet(map) %>% #Adds the map
+  addProviderTiles(providers$CartoDB.Positron) %>% #Adds tiles to the , also makes the map in a more grayscaled verison for an easier overview.
+  addCircleMarkers(
+    ~lat, ~long, radius = ~map$PROFIT/10000, color = ~radopa(map$PROFIT), fillOpacity = 0.5, stroke = TRUE, weight = 1) #This code adds markers for all the stores and controls which opacity they have based on their profit.
+m
+```
+
+```{r}
+#Possible locations for a new store in the Chicago Area
+m %>%
+  addMarkers(-88.08150408963384, 41.91775608154771) %>%
+  addMarkers(-87.7304988849835, 41.87813607354506) %>%
+  addMarkers(-87.97878956146144, 41.96372694284919) %>%
+  addMarkers(-87.93811617315475, 41.60046292596965) %>%
+  addMarkers(-87.83222019138614, 42.127751037376925)
+```
+
+Radopa blir datasettet som lagrer en fargepalett som er blir grønnere jo høyere profitten på butikkene deres er. Samtidig blir den rødere jo dårligere profitten er, eller hvis den går i minus. I denne kodeblokken blir datasettet vi redegjorde ovenfor brukt med Radopa datasettet for å gi en god visuell oversikt over hvordan deres butikker i området gjør det. Den er basert på ett årlig profitt gjennomsnitt for hver enkelt butikk i året 1992 ettersom at dataen fra 1990 var manglede.
